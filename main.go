@@ -101,7 +101,12 @@ func startServer() {
             <head><title>vodafone-station-exporter (Version ` + version + `)</title></head>
             <body>
             <h1>vodafone-station-exporter</h1>
-            <a href="/metrics">metrics</a>
+            <p><a href="` + *vodafoneStationUrl + `">Station Login</a></p>
+            <h2>Metrics</h2>
+            <ul>
+            <li><a href="` + *metricsPath + `">metrics</a>
+            <li><a href="` + *docsisMetricsPath + `">docsis metrics</a>
+            </ul>
             </body>
             </html>`))
 	})
