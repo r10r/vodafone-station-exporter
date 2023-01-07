@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/fluepke/vodafone-station-exporter/api"
 	"github.com/fluepke/vodafone-station-exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -118,7 +119,7 @@ func startServer() {
 func handleMetricsRequest(w http.ResponseWriter, request *http.Request) {
 	registry := prometheus.NewRegistry()
 	c := &collector.Collector{}
-	c.Station = collector.NewVodafoneStation(*vodafoneStationUrl, *vodafoneStationPassword)
+	c.Station = api.NewVodafoneStation(*vodafoneStationUrl, *vodafoneStationPassword)
 	registry.MustRegister(c)
 	promhttp.HandlerFor(registry, promhttp.HandlerOpts{
 		ErrorLog:      log.Default(),
@@ -129,7 +130,7 @@ func handleMetricsRequest(w http.ResponseWriter, request *http.Request) {
 func handleDocsisMetricsRequest(w http.ResponseWriter, request *http.Request) {
 	registry := prometheus.NewRegistry()
 	c := &collector.DocsisCollector{}
-	c.Station = collector.NewVodafoneStation(*vodafoneStationUrl, *vodafoneStationPassword)
+	c.Station = api.NewVodafoneStation(*vodafoneStationUrl, *vodafoneStationPassword)
 	registry.MustRegister(c)
 	promhttp.HandlerFor(registry, promhttp.HandlerOpts{
 		ErrorLog:      log.Default(),

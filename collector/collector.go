@@ -6,11 +6,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fluepke/vodafone-station-exporter/api"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 type BaseCollector struct {
-	Station *VodafoneStation
+	Station *api.VodafoneStation
 }
 
 type DocsisCollector struct {
