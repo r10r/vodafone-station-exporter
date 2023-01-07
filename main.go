@@ -29,6 +29,8 @@ var (
 func main() {
 	flag.Parse()
 
+	log.SetFlags(log.Flags() | log.Lmicroseconds)
+
 	if *showMetrics {
 		describeMetrics()
 		os.Exit(0)

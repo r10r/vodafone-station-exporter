@@ -169,14 +169,14 @@ type StationStatusData struct {
 }
 
 type WanStatusData struct {
-	Ipv4	 string     `json:"ipv4"`
-	Mac           string     `json:"mac_address"`
-	Duration	 string     `json:"duration"`
-	DurationIpv6  string     `json:"durationIpv6"`
-	Expires       string     `json:"expires"`
-	Ipv4Dns       string     `json:"ipv4_dns"`
-	IPAddressV6  []string     `json:"IPAddress_v6"`
-	DNSTblRT        []string   `json:"DNSTblRT"`
+	Ipv4         string   `json:"ipv4"`
+	Mac          string   `json:"mac_address"`
+	Duration     string   `json:"duration"`
+	DurationIpv6 string   `json:"durationIpv6"`
+	Expires      string   `json:"expires"`
+	Ipv4Dns      string   `json:"ipv4_dns"`
+	IPAddressV6  []string `json:"IPAddress_v6"`
+	DNSTblRT     []string `json:"DNSTblRT"`
 }
 
 type CallLog struct {
@@ -223,9 +223,9 @@ type StationAboutResponse struct {
 }
 
 type WanStatusResponse struct {
-	Error   string            `json:"error"`
-	Message string            `json:"message"`
-	Data    *WanStatusData	  `json:"data"`
+	Error   string         `json:"error"`
+	Message string         `json:"message"`
+	Data    *WanStatusData `json:"data"`
 }
 
 type StationAboutData struct {
@@ -415,7 +415,6 @@ func (v *VodafoneStation) getLoginSalts() (*LoginResponseSalts, error) {
 }
 
 func (v *VodafoneStation) doRequest(method, url, body string) ([]byte, error) {
-	log.Printf("Performing request")
 	requestBody := strings.NewReader(body)
 	request, err := http.NewRequest(method, url, requestBody)
 	if err != nil {
@@ -428,10 +427,13 @@ func (v *VodafoneStation) doRequest(method, url, body string) ([]byte, error) {
 	// FIXME ? wrong IP
 	request.Header.Set("Referer", "http://192.168.100.1")
 	request.Header.Set("X-Requested-With", "XMLHttpRequest")
+	log.Printf("%s %s %s", method, url, request.Proto)
 	response, err := v.client.Do(request)
 	if err != nil {
-		log.Printf("Performing request failed: %s", err)
+		log.Printf("%s %s %s %s: %s", method, url, request.Proto, response.Status, err)
 		return nil, err
+	} else {
+		log.Printf("%s %s %s %s", method, url, request.Proto, response.Status)
 	}
 	if response.Body != nil {
 		defer response.Body.Close()
