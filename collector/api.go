@@ -2,11 +2,10 @@ package collector
 
 import (
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/prometheus/common/log"
-	"golang.org/x/crypto/pbkdf2"
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
@@ -14,6 +13,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/prometheus/common/log"
+	"golang.org/x/crypto/pbkdf2"
 )
 
 type VodafoneStation struct {
@@ -265,12 +267,19 @@ func NewVodafoneStation(stationUrl, password string) *VodafoneStation {
 	if err != nil {
 		panic(err)
 	}
+
+	// FIXME allow self-signed certificate of technicolor (by fingerprint ?)
+	// Is the certifacte updated when the firmware is updated automatically ?
+	transCfg := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore expired SSL certificates
+	}
 	return &VodafoneStation{
 		URL:      stationUrl,
 		Password: password,
 		client: &http.Client{
-			Jar:     cookieJar,
-			Timeout: time.Second * 20, // getting DOCSIS status can be slow!
+			Transport: transCfg,
+			Jar:       cookieJar,
+			Timeout:   time.Second * 20, // getting DOCSIS status can be slow!
 		},
 	}
 }
@@ -417,6 +426,7 @@ func (v *VodafoneStation) doRequest(method, url, body string) ([]byte, error) {
 	if method == "POST" {
 		request.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
 	}
+	// FIXME ? wrong IP
 	request.Header.Set("Referer", "http://192.168.100.1")
 	request.Header.Set("X-Requested-With", "XMLHttpRequest")
 	response, err := v.client.Do(request)
