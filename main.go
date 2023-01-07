@@ -23,6 +23,7 @@ var (
 	listenAddress               = flag.String("web.listen-address", "[::]:9420", "Address to listen on")
 	metricsPath                 = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics")
 	docsisMetricsPath           = flag.String("web.docsis-metrics", "/docsis/metrics", "Path under which to expose the docsis metrics")
+	phoneMetricsPath            = flag.String("web.phone-metrics", "/phone/metrics", "Path under which to expose the phone metrics")
 	vodafoneStationUrl          = flag.String("vodafone.station-url", "https://192.168.0.1", "Vodafone station URL. For bridge mode this is 192.168.100.1 (note: Configure a route if using bridge mode)")
 	vodafoneStationPassword     = flag.String("vodafone.station-password", "How is the default password calculated? mhmm", "Password for logging into the Vodafone station")
 	vodafoneStationPasswordFile = flag.String("vodafone.station-password-file", "", "Password file")
@@ -114,6 +115,7 @@ func (s *server) start() {
             <ul>
             <li><a href="` + *metricsPath + `">metrics</a>
             <li><a href="` + *docsisMetricsPath + `">docsis metrics</a>
+            <li><a href="` + *phoneMetricsPath + `">phone metrics</a>
             </ul>
             </body>
             </html>`))
@@ -122,6 +124,8 @@ func (s *server) start() {
 	http.HandleFunc(*metricsPath, s.handleMetricsRequest)
 	log.Printf("serving docsis metrics on %s", *docsisMetricsPath)
 	http.HandleFunc(*docsisMetricsPath, s.handleDocsisMetricsRequest)
+	log.Printf("serving phone metrics on %s", *phoneMetricsPath)
+	http.HandleFunc(*phoneMetricsPath, s.handlePhoneMetricsRequest)
 
 	log.Printf("Listening on %s", *listenAddress)
 	if err := http.ListenAndServe(*listenAddress, nil); err != nil {
@@ -143,6 +147,17 @@ func (s *server) handleMetricsRequest(w http.ResponseWriter, request *http.Reque
 func (s *server) handleDocsisMetricsRequest(w http.ResponseWriter, request *http.Request) {
 	registry := prometheus.NewRegistry()
 	c := &collector.DocsisCollector{}
+	c.Station = s.station
+	registry.MustRegister(c)
+	promhttp.HandlerFor(registry, promhttp.HandlerOpts{
+		ErrorLog:      log.Default(),
+		ErrorHandling: promhttp.ContinueOnError,
+	}).ServeHTTP(w, request)
+}
+
+func (s *server) handlePhoneMetricsRequest(w http.ResponseWriter, request *http.Request) {
+	registry := prometheus.NewRegistry()
+	c := &collector.PhoneCollector{}
 	c.Station = s.station
 	registry.MustRegister(c)
 	promhttp.HandlerFor(registry, promhttp.HandlerOpts{

@@ -18,6 +18,10 @@ type DocsisCollector struct {
 	BaseCollector
 }
 
+type PhoneCollector struct {
+	BaseCollector
+}
+
 type Collector struct {
 	BaseCollector
 }
@@ -242,6 +246,14 @@ func (c *DocsisCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- rangingStatusOfdmaUpstreamDesc
 }
 
+func (c *PhoneCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- callEndTimeDesc
+	ch <- callStartTimeDesc
+
+	ch <- lineStatusDesc
+	ch <- lineNumberDesc
+}
+
 // Describe implements prometheus.Collector interface's Describe function
 func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- loginSuccessDesc
@@ -285,15 +297,9 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- IPAddressV6Desc
 	ch <- DNSTblRTDesc
 
-	ch <- callEndTimeDesc
-	ch <- callStartTimeDesc
-
 	ch <- statusLedEnabledDesc
 
 	ch <- softwareVersionInfoDesc
-
-	ch <- lineStatusDesc
-	ch <- lineNumberDesc
 
 	ch <- logoutSuccessDesc
 	ch <- logoutMessageDesc
@@ -346,6 +352,44 @@ func (c *DocsisCollector) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(bandwidthOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.Bandwidth)*10e9, labels...)
 		ch <- prometheus.MustNewConstMetric(powerOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.Power)*10e9, labels...)
 		ch <- prometheus.MustNewConstMetric(rangingStatusOfdmaUpstreamDesc, prometheus.GaugeValue, 1, append(labels, ofdmaUpstreamChannel.RangingStatus)...)
+	}
+}
+
+// Collect implements prometheus.Collector interface's Collect function
+func (c *PhoneCollector) Collect(ch chan<- prometheus.Metric) {
+	if err := c.Login(ch); err != nil {
+		log.Printf("login failed: %s", err)
+		return
+	}
+
+	callLog, err := c.Station.GetCallLog()
+	if err != nil {
+		log.Printf("Failed to get call log: %s", err)
+	} else {
+		for port, phoneNumberCallLog := range callLog.Lines {
+			if phoneNumberCallLog == nil || phoneNumberCallLog.Data == nil {
+				continue
+			}
+			for _, callLogEntry := range phoneNumberCallLog.Data.Entries { // port", "id", "external_number", "direction", "type
+				labels := []string{port, callLogEntry.Id, callLogEntry.ExternalNumber, callLogEntry.Direction, callLogEntry.Type}
+				ch <- prometheus.MustNewConstMetric(callEndTimeDesc, prometheus.GaugeValue, parse2float(callLogEntry.EndTime), labels...)
+				ch <- prometheus.MustNewConstMetric(callStartTimeDesc, prometheus.GaugeValue, parse2float(callLogEntry.StartTime), labels...)
+			}
+		}
+	}
+
+	phonenumbersResponse, err := c.Station.GetPhonenumbers()
+	if err != nil {
+		log.Printf("Failed to get phone numbers information: %s", err)
+	} else if phonenumbersResponse.Data != nil {
+		ch <- prometheus.MustNewConstMetric(lineStatusDesc, prometheus.GaugeValue, 1, "1", phonenumbersResponse.Data.LineStatus1)
+		ch <- prometheus.MustNewConstMetric(lineStatusDesc, prometheus.GaugeValue, 1, "2", phonenumbersResponse.Data.LineStatus2)
+		for _, phoneNumber := range parseCallnumber(phonenumbersResponse.Data.Callnumber1) {
+			ch <- prometheus.MustNewConstMetric(lineNumberDesc, prometheus.GaugeValue, 1, "1", phoneNumber)
+		}
+		for _, phoneNumber := range parseCallnumber(phonenumbersResponse.Data.Callnumber2) {
+			ch <- prometheus.MustNewConstMetric(lineNumberDesc, prometheus.GaugeValue, 1, "2", phoneNumber)
+		}
 	}
 }
 
@@ -423,22 +467,6 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
-	callLog, err := c.Station.GetCallLog()
-	if err != nil {
-		log.Printf("Failed to get call log: %s", err)
-	} else {
-		for port, phoneNumberCallLog := range callLog.Lines {
-			if phoneNumberCallLog == nil || phoneNumberCallLog.Data == nil {
-				continue
-			}
-			for _, callLogEntry := range phoneNumberCallLog.Data.Entries { // port", "id", "external_number", "direction", "type
-				labels := []string{port, callLogEntry.Id, callLogEntry.ExternalNumber, callLogEntry.Direction, callLogEntry.Type}
-				ch <- prometheus.MustNewConstMetric(callEndTimeDesc, prometheus.GaugeValue, parse2float(callLogEntry.EndTime), labels...)
-				ch <- prometheus.MustNewConstMetric(callStartTimeDesc, prometheus.GaugeValue, parse2float(callLogEntry.StartTime), labels...)
-			}
-		}
-	}
-
 	ledSettingResponse, err := c.Station.GetLedSetting()
 	if err != nil {
 		log.Printf("Failed to get LED setting: %s", err)
@@ -452,20 +480,6 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	} else if stationAboutResponse.Data != nil {
 		for _, softwareInfo := range stationAboutResponse.Data.Software {
 			ch <- prometheus.MustNewConstMetric(softwareVersionInfoDesc, prometheus.GaugeValue, 1, softwareInfo.Name, softwareInfo.Version, softwareInfo.License)
-		}
-	}
-
-	phonenumbersResponse, err := c.Station.GetPhonenumbers()
-	if err != nil {
-		log.Printf("Failed to get phone numbers information: %s", err)
-	} else if phonenumbersResponse.Data != nil {
-		ch <- prometheus.MustNewConstMetric(lineStatusDesc, prometheus.GaugeValue, 1, "1", phonenumbersResponse.Data.LineStatus1)
-		ch <- prometheus.MustNewConstMetric(lineStatusDesc, prometheus.GaugeValue, 1, "2", phonenumbersResponse.Data.LineStatus2)
-		for _, phoneNumber := range parseCallnumber(phonenumbersResponse.Data.Callnumber1) {
-			ch <- prometheus.MustNewConstMetric(lineNumberDesc, prometheus.GaugeValue, 1, "1", phoneNumber)
-		}
-		for _, phoneNumber := range parseCallnumber(phonenumbersResponse.Data.Callnumber2) {
-			ch <- prometheus.MustNewConstMetric(lineNumberDesc, prometheus.GaugeValue, 1, "2", phoneNumber)
 		}
 	}
 }
