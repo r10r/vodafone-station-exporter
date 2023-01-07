@@ -305,15 +305,15 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(powerUpstreamDesc, prometheus.GaugeValue, parse2float(upstreamChannel.Power), labels...)
 			ch <- prometheus.MustNewConstMetric(rangingStatusUpstreamDesc, prometheus.GaugeValue, 1, append(labels, upstreamChannel.RangingStatus)...)
 		}
-        for _, ofdmaUpstreamChannel := range docsisStatusResponse.Data.OfdmaUpstreamData {
-            labels := []string{ofdmaUpstreamChannel.Id, ofdmaUpstreamChannel.ChannelIdUp, ofdmaUpstreamChannel.Fft, ofdmaUpstreamChannel.ChannelType}
-            ch <- prometheus.MustNewConstMetric(startFrequencyOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.StartFrequency)*10e9, labels...)
-            ch <- prometheus.MustNewConstMetric(endFrequencyOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.EndFrequency)*10e9, labels...)
-            ch <- prometheus.MustNewConstMetric(centralFrequencyOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.CentralFrequency)*10e9, labels...)
-            ch <- prometheus.MustNewConstMetric(bandwidthOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.Bandwidth)*10e9, labels...)
-            ch <- prometheus.MustNewConstMetric(powerOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.Power)*10e9, labels...)
-            ch <- prometheus.MustNewConstMetric(rangingStatusOfdmaUpstreamDesc, prometheus.GaugeValue, 1, append(labels, ofdmaUpstreamChannel.RangingStatus)...)
-        }
+		for _, ofdmaUpstreamChannel := range docsisStatusResponse.Data.OfdmaUpstreamData {
+			labels := []string{ofdmaUpstreamChannel.Id, ofdmaUpstreamChannel.ChannelIdUp, ofdmaUpstreamChannel.Fft, ofdmaUpstreamChannel.ChannelType}
+			ch <- prometheus.MustNewConstMetric(startFrequencyOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.StartFrequency)*10e9, labels...)
+			ch <- prometheus.MustNewConstMetric(endFrequencyOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.EndFrequency)*10e9, labels...)
+			ch <- prometheus.MustNewConstMetric(centralFrequencyOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.CentralFrequency)*10e9, labels...)
+			ch <- prometheus.MustNewConstMetric(bandwidthOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.Bandwidth)*10e9, labels...)
+			ch <- prometheus.MustNewConstMetric(powerOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.Power)*10e9, labels...)
+			ch <- prometheus.MustNewConstMetric(rangingStatusOfdmaUpstreamDesc, prometheus.GaugeValue, 1, append(labels, ofdmaUpstreamChannel.RangingStatus)...)
+		}
 	}
 
 	stationStatusResponse, err := c.Station.GetStationStatus()
@@ -364,7 +364,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 
 	wanStatusResponse, err := c.Station.GetWanStatus()
 	if err != nil {
-		log.With("error", err.Error()).Error("Failed to get wan status")
+		log.Printf("Failed to get wan status: %s", err)
 	} else if wanStatusResponse.Data != nil {
 		ch <- prometheus.MustNewConstMetric(Ipv4Desc, prometheus.GaugeValue, 1, wanStatusResponse.Data.Ipv4)
 		ch <- prometheus.MustNewConstMetric(MacDesc, prometheus.GaugeValue, 1, wanStatusResponse.Data.Mac)
