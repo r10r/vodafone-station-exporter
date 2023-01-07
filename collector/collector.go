@@ -388,7 +388,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 		log.Printf("Failed to get call log: %s", err)
 	} else {
 		for port, phoneNumberCallLog := range callLog.Lines {
-			if phoneNumberCallLog.Data == nil {
+			if phoneNumberCallLog == nil || phoneNumberCallLog.Data == nil {
 				continue
 			}
 			for _, callLogEntry := range phoneNumberCallLog.Data.Entries { // port", "id", "external_number", "direction", "type
