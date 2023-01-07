@@ -305,8 +305,6 @@ func (c *DocsisCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	defer c.Logout(ch)
-
 	docsisStatusResponse, err := c.Station.GetDocsisStatus()
 	if err != nil {
 		log.Printf("failed to get docsis status: %s", err)
@@ -357,8 +355,6 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 		log.Printf("login failed: %s", err)
 		return
 	}
-
-	defer c.Logout(ch)
 
 	stationStatusResponse, err := c.Station.GetStationStatus()
 	if err != nil {

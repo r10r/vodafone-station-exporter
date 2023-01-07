@@ -13,15 +13,21 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/pbkdf2"
 )
 
+// The VodafoneStation is the HTTP API client for the VodafoneStation and VodafoneStation Wifi6.
+// It is safe for concurrent use by multiple goroutines and for efficiency should only be created once and re-used.
 type VodafoneStation struct {
 	URL      string
 	Password string
 	client   *http.Client
+
+	login      *LoginResponse
+	loginMutex sync.Mutex
 }
 
 type LoginResponseSalts struct {
@@ -284,8 +290,22 @@ func NewVodafoneStation(stationUrl, password string) *VodafoneStation {
 	}
 }
 
+// Login establishes a session with the VodafoneStation.
+// If the session from a previous Login call is still active it will be re-used.
+// The VodafoneStation only allows a single active session.
+// Any (external) session is invalidated on login.
+// Login is safe for use by multiple go routines but it will block if a login
+// process is in progress.
 func (v *VodafoneStation) Login() (*LoginResponse, error) {
-	_, err := v.doRequest("GET", v.URL, "")
+	v.loginMutex.Lock()
+	defer v.loginMutex.Unlock()
+
+    // Check if the session cookie is still valid and we're still authenticated.
+	resp, responseBody, err := v.doRequest("GET", v.URL+"/api/v1/CheckTimeOut?_="+strconv.FormatInt(makeTimestamp(), 10), "")
+	if err == nil && resp.StatusCode == 200 {
+		return v.login, nil
+	}
+	_, _, err = v.doRequest("GET", v.URL, "")
 	if err != nil {
 		return nil, err
 	}
@@ -307,6 +327,8 @@ func (v *VodafoneStation) Login() (*LoginResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	v.login = loginResponse
 	return loginResponse, nil
 }
 

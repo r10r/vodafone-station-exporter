@@ -55,7 +55,11 @@ func main() {
 		os.Exit(0)
 	}
 
-	startServer()
+	s := server{
+		station: api.NewVodafoneStation(*vodafoneStationUrl, *vodafoneStationPassword),
+	}
+
+	s.start()
 }
 
 func describeMetrics() {
@@ -94,7 +98,11 @@ func describeMetric(desc *prometheus.Desc) {
 	fmt.Println("")
 }
 
-func startServer() {
+type server struct {
+	station *api.VodafoneStation
+}
+
+func (s *server) start() {
 	log.Printf("Starting vodafone-station-exporter (version %s)", version)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
@@ -111,9 +119,9 @@ func startServer() {
             </html>`))
 	})
 	log.Printf("serving metrics on %s", *metricsPath)
-	http.HandleFunc(*metricsPath, handleMetricsRequest)
+	http.HandleFunc(*metricsPath, s.handleMetricsRequest)
 	log.Printf("serving docsis metrics on %s", *docsisMetricsPath)
-	http.HandleFunc(*docsisMetricsPath, handleDocsisMetricsRequest)
+	http.HandleFunc(*docsisMetricsPath, s.handleDocsisMetricsRequest)
 
 	log.Printf("Listening on %s", *listenAddress)
 	if err := http.ListenAndServe(*listenAddress, nil); err != nil {
@@ -121,10 +129,10 @@ func startServer() {
 	}
 }
 
-func handleMetricsRequest(w http.ResponseWriter, request *http.Request) {
+func (s *server) handleMetricsRequest(w http.ResponseWriter, request *http.Request) {
 	registry := prometheus.NewRegistry()
 	c := &collector.Collector{}
-	c.Station = api.NewVodafoneStation(*vodafoneStationUrl, *vodafoneStationPassword)
+	c.Station = s.station
 	registry.MustRegister(c)
 	promhttp.HandlerFor(registry, promhttp.HandlerOpts{
 		ErrorLog:      log.Default(),
@@ -132,10 +140,10 @@ func handleMetricsRequest(w http.ResponseWriter, request *http.Request) {
 	}).ServeHTTP(w, request)
 }
 
-func handleDocsisMetricsRequest(w http.ResponseWriter, request *http.Request) {
+func (s *server) handleDocsisMetricsRequest(w http.ResponseWriter, request *http.Request) {
 	registry := prometheus.NewRegistry()
 	c := &collector.DocsisCollector{}
-	c.Station = api.NewVodafoneStation(*vodafoneStationUrl, *vodafoneStationPassword)
+	c.Station = s.station
 	registry.MustRegister(c)
 	promhttp.HandlerFor(registry, promhttp.HandlerOpts{
 		ErrorLog:      log.Default(),
