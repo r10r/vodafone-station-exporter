@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -14,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/prometheus/common/log"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -415,12 +415,11 @@ func (v *VodafoneStation) getLoginSalts() (*LoginResponseSalts, error) {
 }
 
 func (v *VodafoneStation) doRequest(method, url, body string) ([]byte, error) {
-	logger := log.With("method", method).With("url", url)
-	logger.Debug("Performing request")
+	log.Printf("Performing request")
 	requestBody := strings.NewReader(body)
 	request, err := http.NewRequest(method, url, requestBody)
 	if err != nil {
-		logger.With("error", err.Error).Error("Creating request failed")
+		log.Printf("Creating request failed: %s", err)
 		return nil, err
 	}
 	if method == "POST" {
@@ -431,7 +430,7 @@ func (v *VodafoneStation) doRequest(method, url, body string) ([]byte, error) {
 	request.Header.Set("X-Requested-With", "XMLHttpRequest")
 	response, err := v.client.Do(request)
 	if err != nil {
-		logger.With("error", err.Error).Error("Performing request failed")
+		log.Printf("Performing request failed: %s", err)
 		return nil, err
 	}
 	if response.Body != nil {

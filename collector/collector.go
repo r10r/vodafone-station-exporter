@@ -2,11 +2,12 @@ package collector
 
 import (
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type Collector struct {
@@ -317,7 +318,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 
 	stationStatusResponse, err := c.Station.GetStationStatus()
 	if err != nil {
-		log.With("error", err.Error()).Error("Failed to get station status")
+		log.Printf("Failed to get station status: %s", err)
 	} else if stationStatusResponse.Data != nil {
 		ch <- prometheus.MustNewConstMetric(firewallStatusDesc, prometheus.GaugeValue, 1, stationStatusResponse.Data.FirewallStatus)
 		ch <- prometheus.MustNewConstMetric(lanIPv4Desc, prometheus.GaugeValue, 1, stationStatusResponse.Data.LanIpv4)
@@ -384,13 +385,13 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 
 	callLog, err := c.Station.GetCallLog()
 	if err != nil {
-		log.With("error", err.Error()).Error("Failed to get call log")
+		log.Printf("Failed to get call log: %s", err)
 	} else {
 		for port, phoneNumberCallLog := range callLog.Lines {
 			if phoneNumberCallLog.Data == nil {
 				continue
 			}
-			for _, callLogEntry := range phoneNumberCallLog.Data.Entries { //port", "id", "external_number", "direction", "type
+			for _, callLogEntry := range phoneNumberCallLog.Data.Entries { // port", "id", "external_number", "direction", "type
 				labels := []string{port, callLogEntry.Id, callLogEntry.ExternalNumber, callLogEntry.Direction, callLogEntry.Type}
 				ch <- prometheus.MustNewConstMetric(callEndTimeDesc, prometheus.GaugeValue, parse2float(callLogEntry.EndTime), labels...)
 				ch <- prometheus.MustNewConstMetric(callStartTimeDesc, prometheus.GaugeValue, parse2float(callLogEntry.StartTime), labels...)
@@ -400,14 +401,14 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 
 	ledSettingResponse, err := c.Station.GetLedSetting()
 	if err != nil {
-		log.With("error", err.Error()).Error("Failed to get LED setting")
+		log.Printf("Failed to get LED setting: %s", err)
 	} else if ledSettingResponse.Data != nil {
 		ch <- prometheus.MustNewConstMetric(statusLedEnabledDesc, prometheus.GaugeValue, bool2float64(ledSettingResponse.Data.Led == "true"))
 	}
 
 	stationAboutResponse, err := c.Station.GetStationAbout()
 	if err != nil {
-		log.With("error", err.Error()).Error("Failed to get station about information")
+		log.Printf("Failed to get station about information: %s", err)
 	} else if stationAboutResponse.Data != nil {
 		for _, softwareInfo := range stationAboutResponse.Data.Software {
 			ch <- prometheus.MustNewConstMetric(softwareVersionInfoDesc, prometheus.GaugeValue, 1, softwareInfo.Name, softwareInfo.Version, softwareInfo.License)
@@ -416,7 +417,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 
 	phonenumbersResponse, err := c.Station.GetPhonenumbers()
 	if err != nil {
-		log.With("error", err.Error()).Error("Failed to get phone numbers information")
+		log.Printf("Failed to get phone numbers information: %s", err)
 	} else if phonenumbersResponse.Data != nil {
 		ch <- prometheus.MustNewConstMetric(lineStatusDesc, prometheus.GaugeValue, 1, "1", phonenumbersResponse.Data.LineStatus1)
 		ch <- prometheus.MustNewConstMetric(lineStatusDesc, prometheus.GaugeValue, 1, "2", phonenumbersResponse.Data.LineStatus2)

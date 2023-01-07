@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"reflect"
@@ -11,7 +12,6 @@ import (
 	"github.com/fluepke/vodafone-station-exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/log"
 )
 
 const version = "0.0.1"
@@ -21,7 +21,6 @@ var (
 	showMetrics                 = flag.Bool("show-metrics", false, "Show available metrics and exit")
 	listenAddress               = flag.String("web.listen-address", "[::]:9420", "Address to listen on")
 	metricsPath                 = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics")
-	logLevel                    = flag.String("log.level", "info", "Logging level")
 	vodafoneStationUrl          = flag.String("vodafone.station-url", "https://192.168.0.1", "Vodafone station URL. For bridge mode this is 192.168.100.1 (note: Configure a route if using bridge mode)")
 	vodafoneStationPassword     = flag.String("vodafone.station-password", "How is the default password calculated? mhmm", "Password for logging into the Vodafone station")
 	vodafoneStationPasswordFile = flag.String("vodafone.station-password-file", "", "Password file")
@@ -29,11 +28,6 @@ var (
 
 func main() {
 	flag.Parse()
-	err := log.Base().SetLevel(*logLevel)
-	if err != nil {
-		fmt.Println("Invalid log level")
-		os.Exit(2)
-	}
 
 	if *showMetrics {
 		describeMetrics()
@@ -41,7 +35,7 @@ func main() {
 	}
 
 	if *vodafoneStationPasswordFile != "" {
-		log.Infof("Using password file (%s)", *vodafoneStationPasswordFile)
+		log.Printf("Using password file (%s)", *vodafoneStationPasswordFile)
 		data, err := os.ReadFile(*vodafoneStationPasswordFile)
 		if err != nil {
 			panic(fmt.Errorf("failed to read password file: %w", err))
@@ -97,7 +91,7 @@ func describeMetric(desc *prometheus.Desc) {
 }
 
 func startServer() {
-	log.Infof("Starting vodafone-station-exporter (version %s)", version)
+	log.Printf("Starting vodafone-station-exporter (version %s)", version)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
             <head><title>vodafone-station-exporter (Version ` + version + `)</title></head>
@@ -109,8 +103,10 @@ func startServer() {
 	})
 	http.HandleFunc(*metricsPath, handleMetricsRequest)
 
-	log.Infof("Listening on %s", *listenAddress)
-	log.Fatal(http.ListenAndServe(*listenAddress, nil))
+	log.Printf("Listening on %s", *listenAddress)
+	if err := http.ListenAndServe(*listenAddress, nil); err != nil {
+		log.Printf("Failed to listen: %s", err)
+	}
 }
 
 func handleMetricsRequest(w http.ResponseWriter, request *http.Request) {
@@ -119,7 +115,7 @@ func handleMetricsRequest(w http.ResponseWriter, request *http.Request) {
 		Station: collector.NewVodafoneStation(*vodafoneStationUrl, *vodafoneStationPassword),
 	})
 	promhttp.HandlerFor(registry, promhttp.HandlerOpts{
-		ErrorLog:      log.NewErrorLogger(),
+		ErrorLog:      log.Default(),
 		ErrorHandling: promhttp.ContinueOnError,
 	}).ServeHTTP(w, request)
 }
