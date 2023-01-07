@@ -21,6 +21,7 @@ var (
 	showMetrics                 = flag.Bool("show-metrics", false, "Show available metrics and exit")
 	listenAddress               = flag.String("web.listen-address", "[::]:9420", "Address to listen on")
 	metricsPath                 = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics")
+	docsisMetricsPath           = flag.String("web.docsis-metrics", "/docsis/metrics", "Path under which to expose the docsis metrics")
 	vodafoneStationUrl          = flag.String("vodafone.station-url", "https://192.168.0.1", "Vodafone station URL. For bridge mode this is 192.168.100.1 (note: Configure a route if using bridge mode)")
 	vodafoneStationPassword     = flag.String("vodafone.station-password", "How is the default password calculated? mhmm", "Password for logging into the Vodafone station")
 	vodafoneStationPasswordFile = flag.String("vodafone.station-password-file", "", "Password file")
@@ -103,7 +104,10 @@ func startServer() {
             </body>
             </html>`))
 	})
+	log.Printf("serving metrics on %s", *metricsPath)
 	http.HandleFunc(*metricsPath, handleMetricsRequest)
+	log.Printf("serving docsis metrics on %s", *docsisMetricsPath)
+	http.HandleFunc(*docsisMetricsPath, handleDocsisMetricsRequest)
 
 	log.Printf("Listening on %s", *listenAddress)
 	if err := http.ListenAndServe(*listenAddress, nil); err != nil {
@@ -113,9 +117,20 @@ func startServer() {
 
 func handleMetricsRequest(w http.ResponseWriter, request *http.Request) {
 	registry := prometheus.NewRegistry()
-	registry.MustRegister(&collector.Collector{
-		Station: collector.NewVodafoneStation(*vodafoneStationUrl, *vodafoneStationPassword),
-	})
+	c := &collector.Collector{}
+	c.Station = collector.NewVodafoneStation(*vodafoneStationUrl, *vodafoneStationPassword)
+	registry.MustRegister(c)
+	promhttp.HandlerFor(registry, promhttp.HandlerOpts{
+		ErrorLog:      log.Default(),
+		ErrorHandling: promhttp.ContinueOnError,
+	}).ServeHTTP(w, request)
+}
+
+func handleDocsisMetricsRequest(w http.ResponseWriter, request *http.Request) {
+	registry := prometheus.NewRegistry()
+	c := &collector.DocsisCollector{}
+	c.Station = collector.NewVodafoneStation(*vodafoneStationUrl, *vodafoneStationPassword)
+	registry.MustRegister(c)
 	promhttp.HandlerFor(registry, promhttp.HandlerOpts{
 		ErrorLog:      log.Default(),
 		ErrorHandling: promhttp.ContinueOnError,

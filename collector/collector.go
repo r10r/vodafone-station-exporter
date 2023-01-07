@@ -1,7 +1,6 @@
 package collector
 
 import (
-	"fmt"
 	"log"
 	"regexp"
 	"strconv"
@@ -10,8 +9,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-type Collector struct {
+type BaseCollector struct {
 	Station *VodafoneStation
+}
+
+type DocsisCollector struct {
+	BaseCollector
+}
+
+type Collector struct {
+	BaseCollector
 }
 
 var (
@@ -180,14 +187,35 @@ func init() {
 	logoutMessageDesc = prometheus.NewDesc(prefix+"logout_message_info", "Logout message returned by the web interface", []string{"message"}, nil)
 }
 
-// Describe implements prometheus.Collector interface's Describe function
-func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- loginSuccessDesc
-	ch <- loginMessageDesc
-	ch <- userDesc
-	ch <- uidDesc
-	ch <- defaultPasswordDesc
+func (c *BaseCollector) Logout(ch chan<- prometheus.Metric) {
+	logoutresponse, err := c.Station.Logout()
+	if logoutresponse != nil {
+		ch <- prometheus.MustNewConstMetric(logoutMessageDesc, prometheus.GaugeValue, 1, logoutresponse.Message)
+	}
+	if err != nil {
+		ch <- prometheus.MustNewConstMetric(logoutSuccessDesc, prometheus.GaugeValue, 0)
+	}
+	ch <- prometheus.MustNewConstMetric(logoutSuccessDesc, prometheus.GaugeValue, 1)
+}
 
+func (c *BaseCollector) Login(ch chan<- prometheus.Metric) error {
+	loginresponse, err := c.Station.Login()
+	if loginresponse != nil {
+		ch <- prometheus.MustNewConstMetric(loginMessageDesc, prometheus.GaugeValue, 1, loginresponse.Message)
+	}
+	if err != nil {
+		ch <- prometheus.MustNewConstMetric(loginSuccessDesc, prometheus.GaugeValue, 0)
+		ch <- prometheus.MustNewConstMetric(logoutSuccessDesc, prometheus.GaugeValue, 0)
+		return err
+	}
+	ch <- prometheus.MustNewConstMetric(loginSuccessDesc, prometheus.GaugeValue, 1)
+	ch <- prometheus.MustNewConstMetric(userDesc, prometheus.GaugeValue, 1, loginresponse.Data.User)
+	ch <- prometheus.MustNewConstMetric(uidDesc, prometheus.GaugeValue, 1, loginresponse.Data.Uid)
+	ch <- prometheus.MustNewConstMetric(defaultPasswordDesc, prometheus.GaugeValue, bool2float64(loginresponse.Data.DefaultPassword == "Yes"))
+	return nil
+}
+
+func (c *DocsisCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- centralFrequencyDownstreamDesc
 	ch <- powerDownstreamDesc
 	ch <- snrDownstreamDesc
@@ -211,6 +239,15 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- bandwidthOfdmaUpstreamDesc
 	ch <- powerOfdmaUpstreamDesc
 	ch <- rangingStatusOfdmaUpstreamDesc
+}
+
+// Describe implements prometheus.Collector interface's Describe function
+func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- loginSuccessDesc
+	ch <- loginMessageDesc
+	ch <- userDesc
+	ch <- uidDesc
+	ch <- defaultPasswordDesc
 
 	ch <- firewallStatusDesc
 	ch <- lanIPv4Desc
@@ -261,13 +298,22 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- logoutMessageDesc
 }
 
-func (c *Collector) CollectDocsisStatus(ch chan<- prometheus.Metric) error {
+func (c *DocsisCollector) Collect(ch chan<- prometheus.Metric) {
+	if err := c.Login(ch); err != nil {
+		log.Printf("login failed: %s", err)
+		return
+	}
+
+	defer c.Logout(ch)
+
 	docsisStatusResponse, err := c.Station.GetDocsisStatus()
 	if err != nil {
-		return err
+		log.Printf("failed to get docsis status: %s", err)
+		return
 	}
 	if docsisStatusResponse.Data == nil {
-		return fmt.Errorf("no docsis status data returned")
+		log.Printf("no docsis status data returned")
+		return
 	}
 
 	for _, downstreamChannel := range docsisStatusResponse.Data.Downstream {
@@ -302,30 +348,16 @@ func (c *Collector) CollectDocsisStatus(ch chan<- prometheus.Metric) error {
 		ch <- prometheus.MustNewConstMetric(powerOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.Power)*10e9, labels...)
 		ch <- prometheus.MustNewConstMetric(rangingStatusOfdmaUpstreamDesc, prometheus.GaugeValue, 1, append(labels, ofdmaUpstreamChannel.RangingStatus)...)
 	}
-
-	return nil
 }
 
 // Collect implements prometheus.Collector interface's Collect function
 func (c *Collector) Collect(ch chan<- prometheus.Metric) {
-	loginresponse, err := c.Station.Login()
-	if loginresponse != nil {
-		ch <- prometheus.MustNewConstMetric(loginMessageDesc, prometheus.GaugeValue, 1, loginresponse.Message)
-	}
-	if err != nil {
-		ch <- prometheus.MustNewConstMetric(loginSuccessDesc, prometheus.GaugeValue, 0)
-		ch <- prometheus.MustNewConstMetric(logoutSuccessDesc, prometheus.GaugeValue, 0)
+	if err := c.Login(ch); err != nil {
+		log.Printf("login failed: %s", err)
 		return
 	}
-	ch <- prometheus.MustNewConstMetric(loginSuccessDesc, prometheus.GaugeValue, 1)
-	ch <- prometheus.MustNewConstMetric(userDesc, prometheus.GaugeValue, 1, loginresponse.Data.User)
-	ch <- prometheus.MustNewConstMetric(uidDesc, prometheus.GaugeValue, 1, loginresponse.Data.Uid)
-	ch <- prometheus.MustNewConstMetric(defaultPasswordDesc, prometheus.GaugeValue, bool2float64(loginresponse.Data.DefaultPassword == "Yes"))
 
-	err = c.CollectDocsisStatus(ch)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
+	defer c.Logout(ch)
 
 	stationStatusResponse, err := c.Station.GetStationStatus()
 	if err != nil {
@@ -439,15 +471,6 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(lineNumberDesc, prometheus.GaugeValue, 1, "2", phoneNumber)
 		}
 	}
-
-	logoutresponse, err := c.Station.Logout()
-	if logoutresponse != nil {
-		ch <- prometheus.MustNewConstMetric(logoutMessageDesc, prometheus.GaugeValue, 1, logoutresponse.Message)
-	}
-	if err != nil {
-		ch <- prometheus.MustNewConstMetric(logoutSuccessDesc, prometheus.GaugeValue, 0)
-	}
-	ch <- prometheus.MustNewConstMetric(logoutSuccessDesc, prometheus.GaugeValue, 1)
 }
 
 func parseCallnumber(str string) []string {
