@@ -446,8 +446,6 @@ func (v *VodafoneStation) doRequest(method, url, body string) (*http.Response, [
 	if method == "POST" {
 		request.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
 	}
-	// FIXME ? wrong IP
-	request.Header.Set("Referer", "http://192.168.100.1")
 	request.Header.Set("X-Requested-With", "XMLHttpRequest")
 	log.Printf("%s %s %s", method, url, request.Proto)
 	response, err := v.client.Do(request)
