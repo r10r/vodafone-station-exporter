@@ -294,7 +294,7 @@ func (v *VodafoneStation) Login() (*LoginResponse, error) {
 		return nil, err
 	}
 	derivedPassword := GetLoginPassword(v.Password, loginResponseSalts.Salt, loginResponseSalts.SaltWebUI)
-	responseBody, err := v.doRequest("POST", v.URL+"/api/v1/session/login", "username=admin&password="+derivedPassword)
+	_, responseBody, err = v.doRequest("POST", v.URL+"/api/v1/session/login", "username=admin&password="+derivedPassword)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +303,7 @@ func (v *VodafoneStation) Login() (*LoginResponse, error) {
 	if loginResponse.Error != "ok" {
 		return nil, fmt.Errorf("Got non error=ok message from vodafone station")
 	}
-	_, err = v.doRequest("GET", v.URL+"/api/v1/session/menu", "")
+	_, _, err = v.doRequest("GET", v.URL+"/api/v1/session/menu", "")
 	if err != nil {
 		return nil, err
 	}
@@ -311,7 +311,7 @@ func (v *VodafoneStation) Login() (*LoginResponse, error) {
 }
 
 func (v *VodafoneStation) Logout() (*LogoutResponse, error) {
-	responseBody, err := v.doRequest("POST", v.URL+"/api/v1/session/logout", "")
+	_, responseBody, err := v.doRequest("POST", v.URL+"/api/v1/session/logout", "")
 	if err != nil {
 		return nil, err
 	}
@@ -327,7 +327,7 @@ func (v *VodafoneStation) Logout() (*LogoutResponse, error) {
 }
 
 func (v *VodafoneStation) GetDocsisStatus() (*DocsisStatusResponse, error) {
-	responseBody, err := v.doRequest("GET", v.URL+"/api/v1/sta_docsis_status?_="+strconv.FormatInt(makeTimestamp(), 10), "")
+	_, responseBody, err := v.doRequest("GET", v.URL+"/api/v1/sta_docsis_status?_="+strconv.FormatInt(makeTimestamp(), 10), "")
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +336,7 @@ func (v *VodafoneStation) GetDocsisStatus() (*DocsisStatusResponse, error) {
 }
 
 func (v *VodafoneStation) GetStationStatus() (*StationStatusReponse, error) {
-	responseBody, err := v.doRequest("GET", v.URL+"/api/v1/sta_status?_="+strconv.FormatInt(makeTimestamp(), 10), "")
+	_, responseBody, err := v.doRequest("GET", v.URL+"/api/v1/sta_status?_="+strconv.FormatInt(makeTimestamp(), 10), "")
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +345,7 @@ func (v *VodafoneStation) GetStationStatus() (*StationStatusReponse, error) {
 }
 
 func (v *VodafoneStation) GetCallLog() (*CallLog, error) {
-	responseBody, err := v.doRequest("GET", v.URL+"/api/v1/phone_calllog/1,2/CallTbl?_="+strconv.FormatInt(makeTimestamp(), 10), "")
+	_, responseBody, err := v.doRequest("GET", v.URL+"/api/v1/phone_calllog/1,2/CallTbl?_="+strconv.FormatInt(makeTimestamp(), 10), "")
 	if err != nil {
 		return nil, err
 	}
@@ -359,7 +359,7 @@ func (v *VodafoneStation) GetCallLog() (*CallLog, error) {
 }
 
 func (v *VodafoneStation) GetLedSetting() (*LedSettingResponse, error) {
-	responseBody, err := v.doRequest("GET", v.URL+"/api/v1/set_device?_="+strconv.FormatInt(makeTimestamp(), 10), "")
+	_, responseBody, err := v.doRequest("GET", v.URL+"/api/v1/set_device?_="+strconv.FormatInt(makeTimestamp(), 10), "")
 	if err != nil {
 		return nil, err
 	}
@@ -368,7 +368,7 @@ func (v *VodafoneStation) GetLedSetting() (*LedSettingResponse, error) {
 }
 
 func (v *VodafoneStation) GetWanStatus() (*WanStatusResponse, error) {
-	responseBody, err := v.doRequest("GET", v.URL+"/api/v1/wan?_="+strconv.FormatInt(makeTimestamp(), 10), "")
+	_, responseBody, err := v.doRequest("GET", v.URL+"/api/v1/wan?_="+strconv.FormatInt(makeTimestamp(), 10), "")
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +377,7 @@ func (v *VodafoneStation) GetWanStatus() (*WanStatusResponse, error) {
 }
 
 func (v *VodafoneStation) GetStationAbout() (*StationAboutResponse, error) {
-	responseBody, err := v.doRequest("GET", v.URL+"/api/v1/sta_about?_="+strconv.FormatInt(makeTimestamp(), 10), "")
+	_, responseBody, err := v.doRequest("GET", v.URL+"/api/v1/sta_about?_="+strconv.FormatInt(makeTimestamp(), 10), "")
 	if err != nil {
 		return nil, err
 	}
@@ -386,7 +386,7 @@ func (v *VodafoneStation) GetStationAbout() (*StationAboutResponse, error) {
 }
 
 func (v *VodafoneStation) GetPhonenumbers() (*PhonenumbersResponse, error) {
-	responseBody, err := v.doRequest("GET", v.URL+"/api/v1/pho_phone_numbers?_="+strconv.FormatInt(makeTimestamp(), 10), "")
+	_, responseBody, err := v.doRequest("GET", v.URL+"/api/v1/pho_phone_numbers?_="+strconv.FormatInt(makeTimestamp(), 10), "")
 	if err != nil {
 		return nil, err
 	}
@@ -399,7 +399,7 @@ func makeTimestamp() int64 {
 }
 
 func (v *VodafoneStation) getLoginSalts() (*LoginResponseSalts, error) {
-	responseBody, err := v.doRequest("POST", v.URL+"/api/v1/session/login", "username=admin&password=seeksalthash&logout=true")
+	_, responseBody, err := v.doRequest("POST", v.URL+"/api/v1/session/login", "username=admin&password=seeksalthash&logout=true")
 	if err != nil {
 		return nil, err
 	}
@@ -414,12 +414,12 @@ func (v *VodafoneStation) getLoginSalts() (*LoginResponseSalts, error) {
 	return loginResponseSalts, nil
 }
 
-func (v *VodafoneStation) doRequest(method, url, body string) ([]byte, error) {
+func (v *VodafoneStation) doRequest(method, url, body string) (*http.Response, []byte, error) {
 	requestBody := strings.NewReader(body)
 	request, err := http.NewRequest(method, url, requestBody)
 	if err != nil {
 		log.Printf("Creating request failed: %s", err)
-		return nil, err
+		return nil, nil, err
 	}
 	if method == "POST" {
 		request.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
@@ -431,14 +431,15 @@ func (v *VodafoneStation) doRequest(method, url, body string) ([]byte, error) {
 	response, err := v.client.Do(request)
 	if err != nil {
 		log.Printf("%s %s %s %s: %s", method, url, request.Proto, response.Status, err)
-		return nil, err
+		return response, nil, err
 	} else {
 		log.Printf("%s %s %s %s", method, url, request.Proto, response.Status)
 	}
 	if response.Body != nil {
 		defer response.Body.Close()
 	}
-	return ioutil.ReadAll(response.Body)
+	data, err := ioutil.ReadAll(response.Body)
+	return response, data, err
 }
 
 // GetLoginPassword derives the password using the given salts
