@@ -261,6 +261,51 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- logoutMessageDesc
 }
 
+func (c *Collector) CollectDocsisStatus(ch chan<- prometheus.Metric) error {
+	docsisStatusResponse, err := c.Station.GetDocsisStatus()
+	if err != nil {
+		return err
+	}
+	if docsisStatusResponse.Data == nil {
+		return fmt.Errorf("no docsis status data returned")
+	}
+
+	for _, downstreamChannel := range docsisStatusResponse.Data.Downstream {
+		labels := []string{downstreamChannel.Id, downstreamChannel.ChannelId, downstreamChannel.Fft, downstreamChannel.ChannelType}
+		ch <- prometheus.MustNewConstMetric(centralFrequencyDownstreamDesc, prometheus.GaugeValue, parse2float(downstreamChannel.CentralFrequency)*10e9, labels...)
+		ch <- prometheus.MustNewConstMetric(powerDownstreamDesc, prometheus.GaugeValue, parse2float(downstreamChannel.Power), labels...)
+		ch <- prometheus.MustNewConstMetric(snrDownstreamDesc, prometheus.GaugeValue, parse2float(downstreamChannel.Snr), labels...)
+		ch <- prometheus.MustNewConstMetric(lockedDownstreamDesc, prometheus.GaugeValue, bool2float64(downstreamChannel.Locked == "Locked"), labels...)
+	}
+	for _, ofdmDownstreamChannel := range docsisStatusResponse.Data.OfdmDownstreamData {
+		labels := []string{ofdmDownstreamChannel.Id, ofdmDownstreamChannel.ChannelIdOfdm, ofdmDownstreamChannel.FftOfdm, ofdmDownstreamChannel.ChannelType}
+		ch <- prometheus.MustNewConstMetric(startFrequencyOfdmDownstreamDesc, prometheus.GaugeValue, parse2float(ofdmDownstreamChannel.StartFrequency)*10e9, labels...)
+		ch <- prometheus.MustNewConstMetric(endFrequencyOfdmDownstreamDesc, prometheus.GaugeValue, parse2float(ofdmDownstreamChannel.EndFrequency)*10e9, labels...)
+		ch <- prometheus.MustNewConstMetric(centralFrequencyOfdmDownstreamDesc, prometheus.GaugeValue, parse2float(ofdmDownstreamChannel.CentralFrequencyOfdm)*10e9, labels...)
+		ch <- prometheus.MustNewConstMetric(bandwidthOfdmDownstreamDesc, prometheus.GaugeValue, parse2float(ofdmDownstreamChannel.Bandwidth)*10e9, labels...)
+		ch <- prometheus.MustNewConstMetric(powerOfdmDownstreamDesc, prometheus.GaugeValue, parse2float(ofdmDownstreamChannel.PowerOfdm), labels...)
+		ch <- prometheus.MustNewConstMetric(snrOfdmDownstreamDesc, prometheus.GaugeValue, parse2float(ofdmDownstreamChannel.SnrOfdm), labels...)
+		ch <- prometheus.MustNewConstMetric(lockedOfdmDownstreamDesc, prometheus.GaugeValue, bool2float64(ofdmDownstreamChannel.LockedOfdm == "Locked"), labels...)
+	}
+	for _, upstreamChannel := range docsisStatusResponse.Data.Upstream {
+		labels := []string{upstreamChannel.Id, upstreamChannel.ChannelIdUp, upstreamChannel.Fft, upstreamChannel.ChannelType}
+		ch <- prometheus.MustNewConstMetric(centralFrequencyUpstreamDesc, prometheus.GaugeValue, parse2float(upstreamChannel.CentralFrequency)*10e9, labels...)
+		ch <- prometheus.MustNewConstMetric(powerUpstreamDesc, prometheus.GaugeValue, parse2float(upstreamChannel.Power), labels...)
+		ch <- prometheus.MustNewConstMetric(rangingStatusUpstreamDesc, prometheus.GaugeValue, 1, append(labels, upstreamChannel.RangingStatus)...)
+	}
+	for _, ofdmaUpstreamChannel := range docsisStatusResponse.Data.OfdmaUpstreamData {
+		labels := []string{ofdmaUpstreamChannel.Id, ofdmaUpstreamChannel.ChannelIdUp, ofdmaUpstreamChannel.Fft, ofdmaUpstreamChannel.ChannelType}
+		ch <- prometheus.MustNewConstMetric(startFrequencyOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.StartFrequency)*10e9, labels...)
+		ch <- prometheus.MustNewConstMetric(endFrequencyOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.EndFrequency)*10e9, labels...)
+		ch <- prometheus.MustNewConstMetric(centralFrequencyOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.CentralFrequency)*10e9, labels...)
+		ch <- prometheus.MustNewConstMetric(bandwidthOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.Bandwidth)*10e9, labels...)
+		ch <- prometheus.MustNewConstMetric(powerOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.Power)*10e9, labels...)
+		ch <- prometheus.MustNewConstMetric(rangingStatusOfdmaUpstreamDesc, prometheus.GaugeValue, 1, append(labels, ofdmaUpstreamChannel.RangingStatus)...)
+	}
+
+	return nil
+}
+
 // Collect implements prometheus.Collector interface's Collect function
 func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	loginresponse, err := c.Station.Login()
@@ -277,43 +322,9 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(uidDesc, prometheus.GaugeValue, 1, loginresponse.Data.Uid)
 	ch <- prometheus.MustNewConstMetric(defaultPasswordDesc, prometheus.GaugeValue, bool2float64(loginresponse.Data.DefaultPassword == "Yes"))
 
-	docsisStatusResponse, err := c.Station.GetDocsisStatus()
+	err = c.CollectDocsisStatus(ch)
 	if err != nil {
 		fmt.Println(err.Error())
-	}
-	if err == nil && docsisStatusResponse.Data != nil {
-		for _, downstreamChannel := range docsisStatusResponse.Data.Downstream {
-			labels := []string{downstreamChannel.Id, downstreamChannel.ChannelId, downstreamChannel.Fft, downstreamChannel.ChannelType}
-			ch <- prometheus.MustNewConstMetric(centralFrequencyDownstreamDesc, prometheus.GaugeValue, parse2float(downstreamChannel.CentralFrequency)*10e9, labels...)
-			ch <- prometheus.MustNewConstMetric(powerDownstreamDesc, prometheus.GaugeValue, parse2float(downstreamChannel.Power), labels...)
-			ch <- prometheus.MustNewConstMetric(snrDownstreamDesc, prometheus.GaugeValue, parse2float(downstreamChannel.Snr), labels...)
-			ch <- prometheus.MustNewConstMetric(lockedDownstreamDesc, prometheus.GaugeValue, bool2float64(downstreamChannel.Locked == "Locked"), labels...)
-		}
-		for _, ofdmDownstreamChannel := range docsisStatusResponse.Data.OfdmDownstreamData {
-			labels := []string{ofdmDownstreamChannel.Id, ofdmDownstreamChannel.ChannelIdOfdm, ofdmDownstreamChannel.FftOfdm, ofdmDownstreamChannel.ChannelType}
-			ch <- prometheus.MustNewConstMetric(startFrequencyOfdmDownstreamDesc, prometheus.GaugeValue, parse2float(ofdmDownstreamChannel.StartFrequency)*10e9, labels...)
-			ch <- prometheus.MustNewConstMetric(endFrequencyOfdmDownstreamDesc, prometheus.GaugeValue, parse2float(ofdmDownstreamChannel.EndFrequency)*10e9, labels...)
-			ch <- prometheus.MustNewConstMetric(centralFrequencyOfdmDownstreamDesc, prometheus.GaugeValue, parse2float(ofdmDownstreamChannel.CentralFrequencyOfdm)*10e9, labels...)
-			ch <- prometheus.MustNewConstMetric(bandwidthOfdmDownstreamDesc, prometheus.GaugeValue, parse2float(ofdmDownstreamChannel.Bandwidth)*10e9, labels...)
-			ch <- prometheus.MustNewConstMetric(powerOfdmDownstreamDesc, prometheus.GaugeValue, parse2float(ofdmDownstreamChannel.PowerOfdm), labels...)
-			ch <- prometheus.MustNewConstMetric(snrOfdmDownstreamDesc, prometheus.GaugeValue, parse2float(ofdmDownstreamChannel.SnrOfdm), labels...)
-			ch <- prometheus.MustNewConstMetric(lockedOfdmDownstreamDesc, prometheus.GaugeValue, bool2float64(ofdmDownstreamChannel.LockedOfdm == "Locked"), labels...)
-		}
-		for _, upstreamChannel := range docsisStatusResponse.Data.Upstream {
-			labels := []string{upstreamChannel.Id, upstreamChannel.ChannelIdUp, upstreamChannel.Fft, upstreamChannel.ChannelType}
-			ch <- prometheus.MustNewConstMetric(centralFrequencyUpstreamDesc, prometheus.GaugeValue, parse2float(upstreamChannel.CentralFrequency)*10e9, labels...)
-			ch <- prometheus.MustNewConstMetric(powerUpstreamDesc, prometheus.GaugeValue, parse2float(upstreamChannel.Power), labels...)
-			ch <- prometheus.MustNewConstMetric(rangingStatusUpstreamDesc, prometheus.GaugeValue, 1, append(labels, upstreamChannel.RangingStatus)...)
-		}
-		for _, ofdmaUpstreamChannel := range docsisStatusResponse.Data.OfdmaUpstreamData {
-			labels := []string{ofdmaUpstreamChannel.Id, ofdmaUpstreamChannel.ChannelIdUp, ofdmaUpstreamChannel.Fft, ofdmaUpstreamChannel.ChannelType}
-			ch <- prometheus.MustNewConstMetric(startFrequencyOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.StartFrequency)*10e9, labels...)
-			ch <- prometheus.MustNewConstMetric(endFrequencyOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.EndFrequency)*10e9, labels...)
-			ch <- prometheus.MustNewConstMetric(centralFrequencyOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.CentralFrequency)*10e9, labels...)
-			ch <- prometheus.MustNewConstMetric(bandwidthOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.Bandwidth)*10e9, labels...)
-			ch <- prometheus.MustNewConstMetric(powerOfdmaUpstreamDesc, prometheus.GaugeValue, parse2float(ofdmaUpstreamChannel.Power)*10e9, labels...)
-			ch <- prometheus.MustNewConstMetric(rangingStatusOfdmaUpstreamDesc, prometheus.GaugeValue, 1, append(labels, ofdmaUpstreamChannel.RangingStatus)...)
-		}
 	}
 
 	stationStatusResponse, err := c.Station.GetStationStatus()
