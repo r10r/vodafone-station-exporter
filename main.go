@@ -3,25 +3,28 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
+	"os"
+	"reflect"
+	"strings"
+
 	"github.com/fluepke/vodafone-station-exporter/collector"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
-	"net/http"
-	"os"
-	"reflect"
 )
 
 const version = "0.0.1"
 
 var (
-	showVersion             = flag.Bool("version", false, "Print version and exit")
-	showMetrics             = flag.Bool("show-metrics", false, "Show available metrics and exit")
-	listenAddress           = flag.String("web.listen-address", "[::]:9420", "Address to listen on")
-	metricsPath             = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics")
-	logLevel                = flag.String("log.level", "info", "Logging level")
-	vodafoneStationUrl      = flag.String("vodafone.station-url", "http://192.168.0.1", "Vodafone station URL. For bridge mode this is 192.168.100.1 (note: Configure a route if using bridge mode)")
-	vodafoneStationPassword = flag.String("vodafone.station-password", "How is the default password calculated? mhmm", "Password for logging into the Vodafone station")
+	showVersion                 = flag.Bool("version", false, "Print version and exit")
+	showMetrics                 = flag.Bool("show-metrics", false, "Show available metrics and exit")
+	listenAddress               = flag.String("web.listen-address", "[::]:9420", "Address to listen on")
+	metricsPath                 = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics")
+	logLevel                    = flag.String("log.level", "info", "Logging level")
+	vodafoneStationUrl          = flag.String("vodafone.station-url", "http://192.168.0.1", "Vodafone station URL. For bridge mode this is 192.168.100.1 (note: Configure a route if using bridge mode)")
+	vodafoneStationPassword     = flag.String("vodafone.station-password", "How is the default password calculated? mhmm", "Password for logging into the Vodafone station")
+	vodafoneStationPasswordFile = flag.String("vodafone.station-password-file", "", "Password file")
 )
 
 func main() {
@@ -35,6 +38,15 @@ func main() {
 	if *showMetrics {
 		describeMetrics()
 		os.Exit(0)
+	}
+
+	if *vodafoneStationPasswordFile != "" {
+		log.Infof("Using password file (%s)", *vodafoneStationPasswordFile)
+		data, err := os.ReadFile(*vodafoneStationPasswordFile)
+		if err != nil {
+			panic(fmt.Errorf("failed to read password file: %w", err))
+		}
+		*vodafoneStationPassword = strings.TrimSpace(string(data))
 	}
 
 	if *showVersion {
